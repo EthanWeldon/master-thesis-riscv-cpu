@@ -70,7 +70,7 @@ logic mul_en_d;
 logic [1:0] execute_out_sel_d;
 logic dmem_read_en_d;
 logic dmem_write_en_d;
-logic reg_writedata_sel_dl;
+logic reg_writedata_sel_d;
 logic [4:0] reg_read_addr1_d;
 logic [4:0] reg_read_addr2_d;
 logic [31:0] reg_readdata1_d;

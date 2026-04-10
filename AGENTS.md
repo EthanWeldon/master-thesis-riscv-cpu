@@ -46,3 +46,54 @@ This repository contains a thesis-oriented RISC-V CPU project. Future AI assista
 - Be cautious with environment-specific paths.
 - Keep test and measurement setup reproducible.
 - If a task changes evaluation methodology, record that change in the journal.
+
+## Testbench System (added 2026-04-10)
+
+The baseline test suite lives in `RISC_V/tb/` and `RISC_V/tests/specs/`.
+
+Key files:
+- `RISC_V/tb/cpu_if.sv`         — SystemVerilog interface with clocking block and modports (tb / dut)
+- `RISC_V/tb/cpu_test_pkg.sv`   — Package: shared types (test_descriptor_t, reg_check_t, mem_check_t), parse utilities
+- `RISC_V/tb/tb_cpu_suite.sv`   — Top testbench containing: yaml_loader (module), cpu_suite_runner (program), tb_cpu_suite (top module)
+- `RISC_V/tests/specs/baseline-suite.yaml` — Machine-readable test spec: expected register and memory state per test
+
+How it works:
+1. yaml_loader reads baseline-suite.yaml at sim start and populates test_descriptor_t array
+2. cpu_suite_runner iterates enabled tests, calls $readmemh to reload ROM per test, resets DUT, runs until x12==1 or timeout
+3. Shadow register file tracks every WB-bus write; compared against YAML expected values at end of each test
+4. Memory checks use hierarchical reference to Data_Memory_Block.data_memory (byte array, big-endian)
+
+Stop condition: simulation stops when x12 (reg 12) is written with value 1. All test programs must terminate this way.
+
+VCS compile + run (from repo root):
+```
+vcs -sverilog -timescale=1ns/1ps \
+    RISC_V/tb/cpu_test_pkg.sv \
+    RISC_V/tb/cpu_if.sv \
+    RISC_V/rtl/blocks/ALU_Block.sv \
+    RISC_V/rtl/blocks/Branch_Predictor_Block.sv \
+    RISC_V/rtl/blocks/Control_Unit_Block.sv \
+    RISC_V/rtl/blocks/Data_Memory_Block.sv \
+    RISC_V/rtl/blocks/Forwarding_Unit_Block.sv \
+    RISC_V/rtl/blocks/Immediate_Generator_Block.sv \
+    RISC_V/rtl/blocks/Instruction_Memory_Block.sv \
+    RISC_V/rtl/blocks/Register_File_Block.sv \
+    RISC_V/rtl/pipeline_registers/DE_EX.sv \
+    RISC_V/rtl/pipeline_registers/EX_MEM.sv \
+    RISC_V/rtl/pipeline_registers/FE_DE.sv \
+    RISC_V/rtl/pipeline_registers/MEM_WB.sv \
+    RISC_V/rtl/stages/Decode_Stage.sv \
+    RISC_V/rtl/stages/Execute_Stage.sv \
+    RISC_V/rtl/stages/Fetch_Stage_bp.sv \
+    RISC_V/rtl/stages/Memory_Stage.sv \
+    RISC_V/rtl/stages/Writeback_Stage.sv \
+    RISC_V/rtl/top/RISC_V_02.sv \
+    RISC_V/tb/tb_cpu_suite.sv \
+    -top tb_cpu_suite -o simv
+./simv
+```
+
+Known baseline RTL issues (pre-existing, do not fix without thesis justification):
+- Data_Memory_Block uses $urandom init — load tests must SW before LW
+- Branch predictor state resets to 00 (predict not-taken); first taken branch always causes a flush
+- reg_write_en signal is not exposed on the WB bus output of RISC_V_02; shadow copy uses reg_writeaddr != 0 as write-enable proxy

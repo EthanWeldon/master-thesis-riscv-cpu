@@ -1,5 +1,5 @@
 module Decode_Stage(
-    input logic clk;
+    input logic clk,
     input logic [31:0] instr_d,             // Instruction from the fetch stage
     input logic [31:0] pc_d_in,               // Program Counter from the fetch stage
 
