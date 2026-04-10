@@ -1,0 +1,320 @@
+Project Plan
+Exploring Minimal Dynamic Scheduling Mechanisms in Single-Issue In-Order RISC-V Cores
+1. Motivation
+
+Modern high-performance processors rely on out-of-order (OoO) execution to exploit instruction-level parallelism (ILP). However, embedded-class and small RISC-V cores remain strictly in-order due to area and complexity constraints.
+
+This project investigates the architectural boundary between strict in-order execution and full OoO execution. Specifically, it explores how much performance improvement can be achieved in a simple single-issue RISC-V core using minimal dynamic scheduling mechanisms, without introducing:
+
+Register renaming
+
+A large reorder buffer (ROB)
+
+Superscalar issue
+
+Memory speculation
+
+The goal is to systematically evaluate the performance–complexity tradeoff of small dynamic mechanisms in embedded-style cores.
+
+2. Research Question
+
+Primary Research Question:
+
+How much of the performance benefit of out-of-order execution can be recovered in a single-issue in-order RISC-V core using a small instruction window and minimal dynamic scheduling mechanisms?
+
+Secondary Questions:
+
+What is the performance impact of increasing instruction window size (2 / 4 / 6 entries)?
+
+How sensitive is performance improvement to execution latency (e.g., multi-cycle multiplier)?
+
+How does front-end decoupling (fetch queue depth) affect backend scheduling effectiveness?
+
+Where do diminishing returns appear in window size and front-end buffering?
+
+3. Baseline Architecture
+
+Starting point:
+
+5-stage single-issue in-order RISC-V core
+
+IF → ID → EX → MEM → WB
+
+1-cycle memory model (kept simple)
+
+Basic branch predictor (e.g., bimodal)
+
+Strict in-order issue, execution, and commit
+
+This serves as the control configuration.
+
+4. Architectural Enhancements (Incremental Stages)
+
+The project proceeds in controlled stages.
+
+Stage 1: Multi-Cycle Execution Unit
+
+Purpose:
+
+Introduce realistic backend pressure.
+
+Create execution-induced stalls.
+
+Modifications:
+
+Add configurable multi-cycle multiplier (e.g., 2 / 3 / 4 cycles).
+
+Baseline behavior: stall pipeline while multiplier is busy.
+
+Measurements:
+
+Stall cycle breakdown.
+
+IPC degradation versus 1-cycle multiplier.
+
+Impact of increasing execution latency.
+
+Stage 2: Instruction Window + Scoreboard (OoO-lite Core)
+
+Purpose:
+
+Allow limited out-of-order execution while maintaining in-order commit.
+
+New Structures:
+
+Instruction Window (size = 2 / 4 / 6)
+
+Each entry contains:
+
+Valid bit
+
+Opcode
+
+Source register IDs
+
+Destination register ID
+
+Operand values
+
+Operand ready bits
+
+Completion bit
+
+Result value
+
+Scoreboard
+
+One readiness bit per architectural register.
+
+Updated on decode (mark rd not ready).
+
+Updated on execution completion (mark rd ready).
+
+Issue Logic
+
+Oldest-ready-first selection.
+
+Single issue per cycle.
+
+Issue from window into ID/EX register.
+
+Commit Logic
+
+Commit pointer tracks oldest window entry.
+
+Architectural register file updated only when:
+
+Entry is complete
+
+Entry is oldest
+
+In-order commit enforced.
+
+No register renaming.
+
+Constraints:
+
+Single issue.
+
+No ROB.
+
+No register renaming.
+
+No memory speculation.
+
+Measurements:
+
+IPC improvement over baseline.
+
+Window utilization statistics.
+
+Stall cycle breakdown.
+
+Ready instruction frequency.
+
+Sensitivity to window size.
+
+Stage 3: Front-End Decoupling (Fetch Queue)
+
+Purpose:
+
+Prevent fetch starvation when backend stalls.
+
+Study front-end/back-end interaction.
+
+New Structure:
+
+Fetch Queue (depth = 0 / 4 / 8)
+
+Fetch continues during backend stalls.
+
+Branch predictor runs continuously.
+
+Decode consumes from queue when window not full.
+
+Branch Predictor Variants:
+
+Bimodal (baseline)
+
+Gshare (or similar lightweight predictor)
+
+Measurements:
+
+IPC versus queue depth.
+
+Branch misprediction impact.
+
+Front-end starvation cycles.
+
+Interaction with window size.
+
+Optional extension (if time permits):
+
+Limited dual-path fetch for short windows.
+
+5. Evaluation Plan
+Parameter Sweep
+
+Backend:
+
+Window size: 0 (baseline), 2, 4, 6
+
+Multiplier latency: 1, 2, 4 cycles
+
+Frontend:
+
+Fetch queue depth: 0, 4, 8
+
+Predictor type: bimodal vs gshare
+
+Metrics
+
+Performance:
+
+IPC / CPI
+
+Speedup over baseline
+
+Pipeline Behavior:
+
+Stall cycle breakdown:
+
+Execution unit busy
+
+Operand not ready
+
+Control flush
+
+Fetch starvation
+
+Window occupancy distribution
+
+Percentage of cycles with ≥1 ready instruction
+
+Complexity Proxies:
+
+Number of window entries
+
+Scoreboard state bits
+
+Control logic growth (qualitative)
+
+Structural comparisons
+
+No physical design (area/power) modeling required.
+
+6. Architectural Boundaries
+
+This project intentionally avoids:
+
+Register renaming
+
+Large reorder buffers
+
+Superscalar issue
+
+Memory disambiguation
+
+Speculative loads/stores
+
+Cache modeling
+
+Physical design exploration
+
+This ensures the study remains focused on minimal dynamic scheduling mechanisms.
+
+7. Expected Contributions
+
+A minimal OoO-lite scheduling architecture for single-issue RISC-V cores.
+
+A systematic exploration of window size vs performance.
+
+Quantification of diminishing returns in small dynamic scheduling.
+
+Analysis of front-end/back-end interaction in constrained pipelines.
+
+Clear architectural comparison between strict in-order and limited dynamic execution.
+
+8. Relationship to Prior Work
+
+Scoreboarding (CDC 6600) demonstrated early dynamic scheduling.
+
+Tomasulo’s algorithm introduced renaming and reservation stations.
+
+Modern OoO cores use ROBs and physical register files.
+
+This project differs by:
+
+Restricting to single-issue execution.
+
+Avoiding register renaming.
+
+Using very small windows.
+
+Targeting embedded-style RISC-V cores.
+
+Providing systematic parameter exploration rather than full OoO implementation.
+
+9. Implementation Timeline (Two Semesters)
+
+Semester 1:
+
+Add multi-cycle execution.
+
+Implement instruction window and scoreboard.
+
+Validate in-order commit.
+
+Initial performance experiments.
+
+Semester 2:
+
+Add fetch queue.
+
+Add alternate branch predictor.
+
+Perform parameter sweeps.
+
+Analyze diminishing returns.
+
+Write thesis.

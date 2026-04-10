@@ -1,0 +1,26 @@
+// prog_dep_alu_back_to_back.hex
+// Purpose: Every instruction depends on the result of the immediately preceding
+// instruction, exercising both EX-MEM and MEM-WB forwarding paths.
+//
+// Dependency chain:
+//   x1 written by instr 0; read by instr 1 (EX->MEM forward at decode/execute boundary)
+//   x2 written by instr 1; read by instr 2 (EX->MEM forward)
+//   x1 also read by instr 2 (MEM->WB forward)
+//
+// Instruction map:
+//   instr 0  PC=0x00: ADDI x1, x0, 5     x1=5
+//   instr 1  PC=0x04: ADDI x2, x1, 3     x2=8   (EX-MEM forward: x1)
+//   instr 2  PC=0x08: ADD  x3, x2, x1    x3=13  (EX-MEM forward: x2, MEM-WB forward: x1)
+//   instr 3  PC=0x0C: NOP
+//   instr 4  PC=0x10: NOP
+//   instr 5  PC=0x14: ADDI x12, x0, 1    x12=1 -> STOP
+//
+// Expected final state: x1=0x05, x2=0x08, x3=0x0D, x12=0x01
+// Pass condition: x3 must equal 13 (0x0D).
+//                If x3 is stale (e.g. 5+0=5 or 10) forwarding is broken.
+00500093
+00108113
+001101B3
+00000013
+00000013
+00100613

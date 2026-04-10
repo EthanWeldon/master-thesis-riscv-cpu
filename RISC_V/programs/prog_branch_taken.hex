@@ -1,0 +1,38 @@
+// prog_branch_taken.hex
+// Purpose: BNE branch is taken (x1=5 != x2=10), jumps forward past "skipped" code.
+// The branch predictor starts in state=00 (not-taken predict). On the first encounter
+// the predictor predicts NOT taken, fetches instr 5 speculatively, then the execute
+// stage asserts pc_branch_en_sel=2'b10 (taken), causing flush_fd+flush_de and a
+// redirect to PC=0x20. Instr 5 (ADDI x3, x0, 0xAB) is flushed and never commits.
+// Instr 8 (ADDI x3, x0, 55) executes on the taken path and commits x3=55.
+// Terminates when x12 written with value 1.
+//
+// Instruction map:
+//   instr 0  PC=0x00: ADDI x1, x0, 5     x1=5
+//   instr 1  PC=0x04: ADDI x2, x0, 10    x2=10
+//   instr 2  PC=0x08: NOP
+//   instr 3  PC=0x0C: NOP
+//   instr 4  PC=0x10: BNE x1, x2, +16    taken -> PC=0x20
+//   instr 5  PC=0x14: ADDI x3, x0, 0xAB  (FLUSHED, never commits - x3 must NOT be 0xAB)
+//   instr 6  PC=0x18: NOP (flushed)
+//   instr 7  PC=0x1C: NOP (flushed)
+//   instr 8  PC=0x20: ADDI x3, x0, 55    x3=55 (taken path)
+//   instr 9  PC=0x24: NOP
+//   instr10  PC=0x28: NOP
+//   instr11  PC=0x2C: ADDI x12, x0, 1    x12=1 -> STOP
+//
+// Expected final state: x1=0x05, x2=0x0A, x3=0x37, x12=0x01
+// Pass condition: x3 must equal 0x37 (55), not 0xAB (171).
+//                If x3==0xAB it means the flush path is broken.
+00500093
+00A00113
+00000013
+00000013
+08209063
+0AB00193
+00000013
+00000013
+03700193
+00000013
+00000013
+00100613

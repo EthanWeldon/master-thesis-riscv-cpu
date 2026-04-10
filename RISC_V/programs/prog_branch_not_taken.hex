@@ -1,0 +1,27 @@
+// prog_branch_not_taken.hex
+// Purpose: BEQ branch is NOT taken because x1=5 != x2=10. Execution falls through
+// sequentially. The instruction at the branch target address is never reached.
+//
+// Instruction map:
+//   instr 0  PC=0x00: ADDI x1, x0, 5     x1=5
+//   instr 1  PC=0x04: ADDI x2, x0, 10    x2=10
+//   instr 2  PC=0x08: NOP
+//   instr 3  PC=0x0C: NOP
+//   instr 4  PC=0x10: BEQ x1, x2, +8     NOT taken (x1 != x2) -> falls through to PC=0x14
+//   instr 5  PC=0x14: ADDI x3, x0, 99    x3=99 (fall-through path, MUST execute)
+//   instr 6  PC=0x18: NOP (also branch target if taken - would skip x3 write)
+//   instr 7  PC=0x1C: NOP
+//   instr 8  PC=0x20: ADDI x12, x0, 1    x12=1 -> STOP
+//
+// Expected final state: x1=0x05, x2=0x0A, x3=0x63, x12=0x01
+// Pass condition: x3 must equal 0x63 (99).
+//                If x3==0 it means the fall-through path is broken.
+00500093
+00A00113
+00000013
+00000013
+00208463
+06300193
+00000013
+00000013
+00100613

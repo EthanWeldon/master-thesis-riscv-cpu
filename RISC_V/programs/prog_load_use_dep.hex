@@ -1,0 +1,38 @@
+// prog_load_use_dep.hex
+// Purpose: A SW followed by LW followed immediately by an instruction that uses
+// the loaded register. Tests the load-use hazard path.
+//
+// The ADD at instr 8 reads x2 which was just written by the LW at instr 7.
+// There is a 1-cycle gap between the LW and the ADD here (separated by no NOPs),
+// so the MEM-WB forwarding path must supply the correct value.
+//
+// Instruction map:
+//   instr 0  PC=0x00: ADDI x1, x0, 42    x1=42 (value to store)
+//   instr 1  PC=0x04: ADDI x3, x0, 256   x3=256=0x100 (base address)
+//   instr 2  PC=0x08: NOP
+//   instr 3  PC=0x0C: NOP
+//   instr 4  PC=0x10: SW x1, 0(x3)       mem[0x100]=42  (SW rs2=x1 offset=0 rs1=x3)
+//   instr 5  PC=0x14: NOP
+//   instr 6  PC=0x18: NOP
+//   instr 7  PC=0x1C: LW x2, 0(x3)       x2=42 (load from mem[0x100])
+//   instr 8  PC=0x20: ADD x4, x2, x1     x4=42+42=84  (load-use: x2 from LW result)
+//   instr 9  PC=0x24: NOP
+//   instr10  PC=0x28: NOP
+//   instr11  PC=0x2C: ADDI x12, x0, 1    x12=1 -> STOP
+//
+// Expected final state: x1=0x2A, x2=0x2A, x3=0x100, x4=0x54, x12=0x01
+// Expected memory:      mem[0x100]=0x2A
+// Pass condition: x4 must equal 0x54 (84).
+//                If x4==0 or x4==42 then the load-use hazard is not resolved correctly.
+02A00093
+10000193
+00000013
+00000013
+0011A023
+00000013
+00000013
+0001A103
+00110233
+00000013
+00000013
+00100613

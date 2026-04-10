@@ -1,0 +1,187 @@
+suite_name: baseline_suite
+suite_version: 1
+description: Canonical baseline regression and comparison suite for the thesis CPU.
+
+defaults:
+  collect_metrics:
+    - cpu_version
+    - test_name
+    - program_image
+    - pass_fail
+    - cycles
+  compare_after_pass_only: true
+
+tests:
+  - test_name: test_smoke_default_program
+    enabled: false
+    group: regression
+    comparison_role: blocked
+    purpose: Confirm that the default program image reaches a defined termination condition.
+    program_image: RISC_V/programs/imem.hex
+    reason_blocked: Current imem.hex contains only NOPs, so the existing stop condition cannot be reached.
+
+  - test_name: test_alu_add_basic
+    enabled: true
+    group: regression
+    comparison_role: required
+    purpose: Confirm basic add path correctness.
+    program_image: RISC_V/programs/simple_add.hex
+    max_cycles: 40
+    expected_final_state:
+      registers:
+        x1: "0x00000005"
+        x2: "0x0000000A"
+        x3: "0x0000000F"
+      memory_words: {}
+    pass_rule: Final architectural state must match expected registers.
+
+  - test_name: test_alu_sub_basic
+    enabled: true
+    group: regression
+    comparison_role: required
+    purpose: Confirm basic subtract path correctness.
+    program_image: RISC_V/programs/simple_sub.hex
+    max_cycles: 40
+    expected_final_state:
+      registers:
+        x1: "0x00000005"
+        x2: "0x0000000A"
+        x3: "0x00000005"
+      memory_words: {}
+    pass_rule: Final architectural state must match expected registers.
+
+  - test_name: test_branch_basic
+    enabled: false
+    group: regression
+    comparison_role: blocked
+    purpose: Confirm branch redirection and flush-path correctness.
+    program_image: RISC_V/programs/simple_branch.hex
+    reason_blocked: Current branch program appears to branch to itself and is not a clean finite regression test.
+
+  - test_name: test_jump_basic
+    enabled: true
+    group: regression
+    comparison_role: required
+    purpose: Confirm jump path correctness.
+    program_image: RISC_V/programs/simple_jump.hex
+    max_cycles: 60
+    expected_final_state:
+      registers:
+        x1: "0x0000000F"
+        x2: "0x00000010"
+      memory_words: {}
+    pass_rule: Final architectural state must match expected registers.
+
+  - test_name: test_mem_basic
+    enabled: true
+    group: regression
+    comparison_role: required
+    purpose: Confirm store and load behavior.
+    program_image: RISC_V/programs/simple_SW_LW_instr.hex
+    max_cycles: 80
+    expected_final_state:
+      registers:
+        x1: "0x0000002A"
+        x2: "0x0000002A"
+        x3: "0x00000100"
+      memory_words:
+        "0x00000100": "0x0000002A"
+    pass_rule: Final architectural state and observed memory word at address 0x00000100 must match expected values.
+
+  - test_name: test_instr_mix_basic
+    enabled: true
+    group: regression
+    comparison_role: required
+    purpose: Confirm the simplest mixed-instruction smoke path still works.
+    program_image: RISC_V/programs/simple_instr.hex
+    max_cycles: 20
+    expected_final_state:
+      registers:
+        x1: "0x00000005"
+      memory_words: {}
+    pass_rule: Final architectural state must match expected registers.
+
+  - test_name: test_dep_alu_back_to_back
+    enabled: true
+    group: stress
+    comparison_role: required
+    purpose: Exercise back-to-back dependent ALU operations and forwarding behavior.
+    program_image: RISC_V/programs/prog_dep_alu_back_to_back.hex
+    max_cycles: 40
+    expected_final_state:
+      registers:
+        x1: "0x00000005"
+        x2: "0x00000008"
+        x3: "0x0000000D"
+        x12: "0x00000001"
+      memory_words: {}
+    pass_rule: x3 must equal 13 (0x0D). Any other value indicates a forwarding failure on the EX-MEM or MEM-WB path.
+
+  - test_name: test_load_use_dependency
+    enabled: true
+    group: stress
+    comparison_role: required
+    purpose: Exercise load followed by dependent use (load-use hazard).
+    program_image: RISC_V/programs/prog_load_use_dep.hex
+    max_cycles: 60
+    expected_final_state:
+      registers:
+        x1: "0x0000002A"
+        x2: "0x0000002A"
+        x3: "0x00000100"
+        x4: "0x00000054"
+        x12: "0x00000001"
+      memory_words:
+        "0x00000100": "0x0000002A"
+    pass_rule: x4 must equal 84 (0x54). x4==0 or x4==42 indicates the LW result was not forwarded correctly to the dependent ADD.
+
+  - test_name: test_branch_taken
+    enabled: true
+    group: stress
+    comparison_role: required
+    purpose: Isolate taken-branch behavior with a finite terminating program.
+    program_image: RISC_V/programs/prog_branch_taken.hex
+    max_cycles: 60
+    notes: >
+      Branch predictor starts in state=00 (predict not-taken). On first encounter the
+      predictor predicts NOT taken, fetches the instruction at PC+4 speculatively, then
+      execute asserts pc_branch_en_sel=2'b10 causing flush_fd+flush_de and a redirect.
+      The speculatively-fetched instruction (ADDI x3,x0,0xAB) must be flushed and must
+      not commit. The instruction at the taken target (ADDI x3,x0,55) must commit.
+    expected_final_state:
+      registers:
+        x1: "0x00000005"
+        x2: "0x0000000A"
+        x3: "0x00000037"
+        x12: "0x00000001"
+      memory_words: {}
+    pass_rule: x3 must equal 55 (0x37). x3==0xAB (171) indicates the flush path is broken and the speculatively-fetched instruction committed.
+
+  - test_name: test_branch_not_taken
+    enabled: true
+    group: stress
+    comparison_role: required
+    purpose: Isolate not-taken branch behavior with a finite terminating program.
+    program_image: RISC_V/programs/prog_branch_not_taken.hex
+    max_cycles: 60
+    notes: >
+      BEQ x1, x2 with x1=5 and x2=10. Condition is false so the branch is not taken;
+      execution falls through to the next sequential instruction (ADDI x3,x0,99).
+      Branch predictor in state=00 predicts not-taken — prediction is correct, no flush.
+    expected_final_state:
+      registers:
+        x1: "0x00000005"
+        x2: "0x0000000A"
+        x3: "0x00000063"
+        x12: "0x00000001"
+      memory_words: {}
+    pass_rule: x3 must equal 99 (0x63). x3==0 indicates the fall-through instruction was incorrectly flushed.
+
+  - test_name: test_small_sort_kernel
+    enabled: false
+    group: workload
+    comparison_role: planned_required
+    purpose: Provide a compact whole-program workload for repeated cross-version comparison.
+    program_image: null
+    suggested_problem_size: 8
+    reason_blocked: Workload program and expected output data still need to be created.
